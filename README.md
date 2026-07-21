@@ -57,6 +57,7 @@ trankr/
 │   └── icons/
 ├── run.py                 One-command local launcher
 ├── instruction_manual.txt Self-hosting walkthrough for running your own copy
+├── runtime.txt            Pins Python version for deployment platforms (e.g. Render)
 ├── .gitignore
 └── README.md
 ```
@@ -75,6 +76,10 @@ uvicorn main:app --reload
 Then open `http://localhost:8000` — the backend serves the frontend directly. By default the app uses a local SQLite database; set a `DATABASE_URL` environment variable to point it at PostgreSQL instead (see `backend/.env.example`).
 
 **Note on email verification:** registration requires confirming a one-time code sent by email. Without SMTP configured (see `backend/.env.example`), the code is printed to the server console instead — sufficient for local development, but a real SMTP provider is needed for a deployed instance. See `instruction_manual.txt` for a full walkthrough.
+
+## Deployment
+
+`runtime.txt` pins the Python version to 3.11.9 for platforms like Render that otherwise default to the latest Python. This avoids build failures from dependencies (e.g. `pydantic-core`) lacking prebuilt wheels for newer Python versions.
 
 ## API
 
