@@ -2679,16 +2679,16 @@ function renderJournal() {
   document.getElementById('journalThoughts').value = j.thoughts || '';
   document.getElementById('journalIdeas').value = j.ideas || '';
   document.getElementById('journalMoodSel').value = j.mood || '';
-  // Past entries
+  // Entries list (includes today's own entry, so saving actually shows
+  // visible confirmation in the list, not just in the editable boxes above)
   const entriesEl = document.getElementById('journalEntries');
   const entries = Object.entries(state.journals)
-    .filter(([d]) => d !== today)
     .sort(([a],[b]) => b.localeCompare(a))
     .slice(0, 10);
-  if (!entries.length) { entriesEl.innerHTML = '<div style="color:var(--text3);font-size:13px">No previous entries.</div>'; return; }
+  if (!entries.length) { entriesEl.innerHTML = '<div style="color:var(--text3);font-size:13px">No entries yet — write one above.</div>'; return; }
   entriesEl.innerHTML = entries.map(([date, e]) => `
     <div class="journal-entry">
-      <div class="journal-date">${fmtDisplayDate(date)} ${e.mood || ''}</div>
+      <div class="journal-date">${date === today ? 'Today · ' : ''}${fmtDisplayDate(date)} ${e.mood || ''}</div>
       ${e.thoughts ? `<div class="journal-text">${escHtml(e.thoughts)}</div>` : ''}
     </div>`).join('');
 }
