@@ -18,6 +18,8 @@ from auth import (
 )
 from email_utils import send_otp_email
 from datetime import datetime, timedelta
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_requests
 from routes.goals  import router as goals_router
 from routes.tasks  import router as tasks_router
 from routes.habits import router as habits_router
@@ -66,6 +68,16 @@ ALLOWED_EMAILS = {e.strip().lower() for e in _allowed_emails_raw.split(",") if e
 
 def is_email_allowed(email: str) -> bool:
     return not ALLOWED_EMAILS or email.lower() in ALLOWED_EMAILS
+
+# Google Sign-In: OAuth Client ID from https://console.cloud.google.com/apis/credentials
+# (Credentials -> Create Credentials -> OAuth client ID -> Web application).
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+
+
+@app.get("/auth/config", tags=["Auth"])
+def auth_config():
+    """Public, non-secret config the frontend needs at load time."""
+    return {"google_client_id": GOOGLE_CLIENT_ID}
 
 
 # ── Auth Routes ───────────────────────────────────────────────────────────────
@@ -167,10 +179,64 @@ def resend_otp(body: schemas.ResendOTPRequest, db: Session = Depends(get_db)):
 @app.post("/auth/login", response_model=schemas.TokenResponse, tags=["Auth"])
 def login(body: schemas.LoginRequest, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == body.email.lower()).first()
-    if not user or not verify_password(body.password, user.hashed_pw):
+    if not user or not user.hashed_pw or not verify_password(body.password, user.hashed_pw):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
     if not user.is_verified:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Please verify your email before logging in")
+    return schemas.TokenResponse(
+        access_token = create_token(user.id),
+        user_id      = user.id,
+        name         = user.name,
+    )
+
+
+@app.post("/auth/google", response_model=schemas.TokenResponse, tags=["Auth"])
+def google_auth(body: schemas.GoogleAuthRequest, db: Session = Depends(get_db)):
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(
+            status.HTTP_501_NOT_IMPLEMENTED,
+            "Google Sign-In isn't configured on this server (GOOGLE_CLIENT_ID unset)."
+        )
+
+    # Verifies the token's signature, expiry, and that it was issued for our
+    # own Client ID (prevents someone else's Google login token from being
+    # replayed here). Google itself has already confirmed the email is real
+    # and reachable, so there's no OTP/SMTP step needed at all.
+    try:
+        payload = google_id_token.verify_oauth2_token(
+            body.credential, google_requests.Request(), GOOGLE_CLIENT_ID
+        )
+    except ValueError:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid Google credential")
+
+    if not payload.get("email_verified", False):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Google account email is not verified")
+
+    email = payload["email"].lower()
+    name  = payload.get("name") or email.split("@")[0]
+
+    if not is_email_allowed(email):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "This instance is private. To use Trankr yourself, clone the repo "
+            "and self-host — see instruction_manual.txt in the project root."
+        )
+
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if not user:
+        user = models.User(
+            name        = name,
+            email       = email,
+            hashed_pw   = None,          # Google-only account, no password
+            is_verified = True,          # Google already verified the email
+        )
+        db.add(user); db.commit()
+    elif not user.is_verified:
+        # Existing unverified password-registration row for this email —
+        # Google's own verification is sufficient, so just flip it on.
+        user.is_verified = True
+        db.commit()
+
     return schemas.TokenResponse(
         access_token = create_token(user.id),
         user_id      = user.id,
