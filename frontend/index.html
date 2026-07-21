@@ -14,6 +14,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 /* ============================================================
    DESIGN TOKENS
@@ -756,6 +757,16 @@ select.form-input{appearance:none;cursor:pointer}
       <input class="form-input" id="authPassword" type="password" placeholder="••••••••" autocomplete="current-password"/>
     </div>
     <button class="auth-btn" id="authSubmitBtn" onclick="handleAuth()">Sign In</button>
+
+    <div id="googleAuthWrap" style="display:none; margin-top:18px">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px">
+        <div style="flex:1; height:1px; background:var(--border)"></div>
+        <span style="font-size:11px; color:var(--text3)">OR</span>
+        <div style="flex:1; height:1px; background:var(--border)"></div>
+      </div>
+      <div id="googleBtn" style="display:flex; justify-content:center"></div>
+    </div>
+
     <div class="auth-footer">Your data is stored securely on the server 🔒</div>
   </div>
 
@@ -1390,6 +1401,8 @@ const API = {
   verifyOtp: (email,otp)        => api('POST','/auth/verify',{email,otp}),
   resendOtp: (email)            => api('POST','/auth/resend-otp',{email}),
   login:    (email,pw)          => api('POST','/auth/login',{email,password:pw}),
+  googleAuth: (credential)      => api('POST','/auth/google',{credential}),
+  authConfig: ()                 => api('GET', '/auth/config'),
   me:       ()                  => api('GET', '/auth/me'),
 
   // Goals
@@ -1453,6 +1466,41 @@ function switchAuthTab(mode) {
     : 'Free forever — your data stays yours';
   document.getElementById('authSubmitBtn').textContent = mode === 'login' ? 'Sign In' : 'Create Account';
   document.getElementById('authError').style.display = 'none';
+}
+
+// Set up Google Sign-In: ask the backend for the Client ID (kept out of
+// this static file so self-hosters configure it via env var, not by
+// editing frontend code), then render the button if it's configured.
+(async function initGoogleSignIn() {
+  try {
+    const cfg = await API.authConfig();
+    if (!cfg || !cfg.google_client_id || !window.google) return;
+
+    google.accounts.id.initialize({
+      client_id: cfg.google_client_id,
+      callback:  handleGoogleCredentialResponse,
+    });
+    google.accounts.id.renderButton(
+      document.getElementById('googleBtn'),
+      { theme: 'outline', size: 'large', width: 320, text: 'continue_with' }
+    );
+    document.getElementById('googleAuthWrap').style.display = 'block';
+  } catch (e) {
+    // No backend / not configured — just keep email+password auth only.
+  }
+})();
+
+async function handleGoogleCredentialResponse(response) {
+  try {
+    const result = await API.googleAuth(response.credential);
+    if (!result || !result.access_token) {
+      showAuthError('Google sign-in failed. Please try again.');
+      return;
+    }
+    completeLogin(result);
+  } catch (e) {
+    showAuthError(e.message || 'Google sign-in failed');
+  }
 }
 
 let pendingVerifyEmail = null;
