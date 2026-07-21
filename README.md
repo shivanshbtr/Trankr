@@ -19,7 +19,7 @@ A full-stack personal productivity tracker for goals, milestones, habits, daily 
 - **Habits** — recurring habit tracking with daily logs
 - **Journal** — daily thoughts, ideas, and mood entries
 - **Daily Targets & Top 3** — set daily targets (study, workout, sleep, etc.) and top 3 priorities
-- **Email-verified accounts** — registration requires confirming a one-time code sent to your email before login is enabled
+- **Sign in with Google** — recommended login method; Google verifies the email, no SMTP/email service needed
 - **Optional single-tenant lock** — restrict registration to specific email address(es) via config, or leave open for multi-user self-hosting
 - **JWT authentication** — token-based sessions with hashed passwords
 - **Installable PWA** — add to your phone or desktop home screen and use it like a native app
@@ -31,8 +31,7 @@ A full-stack personal productivity tracker for goals, milestones, habits, daily 
 | -------- | ----------------------------------------------------------------- |
 | Backend  | FastAPI, SQLAlchemy                                               |
 | Database | SQLite (dev) / PostgreSQL (production, via psycopg2)              |
-| Auth     | JWT (python-jose), passlib (sha256_crypt), email OTP verification |
-| Email    | Brevo transactional email API (HTTPS, Render-free-tier friendly) |
+| Auth     | JWT (python-jose), passlib (sha256_crypt), Google Sign-In (google-auth), optional email/OTP fallback |
 | Frontend | Vanilla HTML/CSS/JS single-page app, Chart.js                     |
 | PWA      | Web App Manifest + Service Worker                                 |
 
@@ -46,7 +45,7 @@ trankr/
 │   ├── models.py          ORM table definitions
 │   ├── schemas.py         Pydantic request/response models
 │   ├── auth.py            JWT, password hashing, OTP generation
-│   ├── email_utils.py     Sends OTP verification emails via Brevo's API
+│   ├── email_utils.py     Optional: OTP email fallback via Brevo's API (not needed if using Google Sign-In)
 │   ├── routes/            goals, tasks, habits/journal/targets routers
 │   ├── requirements.txt
 │   └── .env.example       Template for local secrets (never commit the real .env)
@@ -74,7 +73,7 @@ uvicorn main:app --reload
 
 Then open `http://localhost:8000` — the backend serves the frontend directly. By default the app uses a local SQLite database; set a `DATABASE_URL` environment variable to point it at PostgreSQL instead (see `backend/.env.example`).
 
-**Note on email verification:** registration requires confirming a one-time code sent by email. Without `BREVO_API_KEY` configured (see `backend/.env.example`), the code is printed to the server console instead — sufficient for local development, but a real Brevo account is needed for a deployed instance (email is sent via Brevo's HTTP API rather than SMTP, since Render's free tier blocks outbound SMTP ports). See `instruction_manual.txt` for a full walkthrough.
+**Note on login:** the recommended path is Sign in with Google — set `GOOGLE_CLIENT_ID` (see `backend/.env.example`) and the Google button appears automatically; Google verifies the email itself, so no email service is required. Email/password + OTP registration still works as a fallback if `GOOGLE_CLIENT_ID` is left unset, but needs `BREVO_API_KEY` configured for a deployed instance (otherwise the OTP is just printed to the server console, fine for local dev only). See `instruction_manual.txt` for a full walkthrough.
 
 ## API
 
