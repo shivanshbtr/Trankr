@@ -8,7 +8,7 @@ A full-stack personal productivity tracker for goals, milestones, habits, daily 
 ![PWA](https://img.shields.io/badge/installable-PWA-7c6dfa)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
-> **Note:** the author runs a personal, private instance of this app — registration there is restricted to their own account. The full source is available here for anyone who wants to run their own copy; see [`instruction_manual.txt`](./instruction_manual.txt) for a complete self-hosting walkthrough (free, no coding required).
+> **Note:** I run a personal, private instance of this app — registration there is restricted to my own account. The full source is available here for anyone who wants to run their own copy; see [`instruction_manual.txt`](./instruction_manual.txt) for a complete self-hosting walkthrough (free, no coding required).
 
 ---
 
@@ -32,7 +32,7 @@ A full-stack personal productivity tracker for goals, milestones, habits, daily 
 | Backend  | FastAPI, SQLAlchemy                                               |
 | Database | SQLite (dev) / PostgreSQL (production, via psycopg2)              |
 | Auth     | JWT (python-jose), passlib (sha256_crypt), email OTP verification |
-| Email    | SMTP (any provider — Gmail, Resend, etc.)                        |
+| Email    | Brevo transactional email API (HTTPS, Render-free-tier friendly) |
 | Frontend | Vanilla HTML/CSS/JS single-page app, Chart.js                     |
 | PWA      | Web App Manifest + Service Worker                                 |
 
@@ -46,7 +46,7 @@ trankr/
 │   ├── models.py          ORM table definitions
 │   ├── schemas.py         Pydantic request/response models
 │   ├── auth.py            JWT, password hashing, OTP generation
-│   ├── email_utils.py     Sends OTP verification emails via SMTP
+│   ├── email_utils.py     Sends OTP verification emails via Brevo's API
 │   ├── routes/            goals, tasks, habits/journal/targets routers
 │   ├── requirements.txt
 │   └── .env.example       Template for local secrets (never commit the real .env)
@@ -74,7 +74,7 @@ uvicorn main:app --reload
 
 Then open `http://localhost:8000` — the backend serves the frontend directly. By default the app uses a local SQLite database; set a `DATABASE_URL` environment variable to point it at PostgreSQL instead (see `backend/.env.example`).
 
-**Note on email verification:** registration requires confirming a one-time code sent by email. Without SMTP configured (see `backend/.env.example`), the code is printed to the server console instead — sufficient for local development, but a real SMTP provider is needed for a deployed instance. See `instruction_manual.txt` for a full walkthrough.
+**Note on email verification:** registration requires confirming a one-time code sent by email. Without `BREVO_API_KEY` configured (see `backend/.env.example`), the code is printed to the server console instead — sufficient for local development, but a real Brevo account is needed for a deployed instance (email is sent via Brevo's HTTP API rather than SMTP, since Render's free tier blocks outbound SMTP ports). See `instruction_manual.txt` for a full walkthrough.
 
 ## API
 
