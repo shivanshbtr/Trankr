@@ -1808,7 +1808,15 @@ function resetLocalCache() {
    DATE UTILS
    ============================================================ */
 function todayStr() { return fmtDate(new Date()); }
-function fmtDate(d) { return d.toISOString().split('T')[0]; }
+function fmtDate(d) {
+  // Use local date components, not toISOString() (which is UTC and
+  // rolls over to the "next" date early for timezones ahead of UTC,
+  // or the "previous" date late for timezones behind it).
+  const y   = d.getFullYear();
+  const m   = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 function parseDate(s) { return new Date(s + 'T00:00:00'); }
 function daysLeft(endDate) {
   const diff = parseDate(endDate) - new Date();
