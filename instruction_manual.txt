@@ -17,13 +17,17 @@ REQUIREMENTS
 - A free GitHub account (to hold your copy of the code)
 - A free Render account (render.com) — runs the app
 - A free Neon account (neon.tech) — stores your data
-- A free Brevo account (brevo.com) — sends your login verification codes
+- A free Google Cloud account (console.cloud.google.com) — lets you sign in
+  with Google, no email service needed at all
 No credit card is required for any of these at the free tier used here.
 
-NOTE: Render's free tier blocks outbound SMTP ports, so a Gmail
-App Password (which relies on SMTP) won't work for the deployed app —
-that's why Brevo's email API is used here instead. Brevo's free tier
-sends up to 300 emails/day over plain HTTPS, which Render allows.
+NOTE: Trankr used to send a 6-digit code by email to verify new accounts,
+but Render's free tier blocks outbound SMTP ports (25/465/587), and even
+routing that email through an HTTP API (Brevo) runs into deliverability
+issues depending on your sending domain. Signing in with Google sidesteps
+all of it — Google verifies the email for you, no email service required.
+The old email/OTP path still exists as a fallback (see the Appendix at
+the end of this file) if you'd rather not use Google Sign-In.
 
 
 STEP 1 — Get your own copy of the code
@@ -42,29 +46,25 @@ STEP 2 — Create a free database
    Keep this handy for Step 4.
 
 
-STEP 3 — Set up email verification (so you can actually log in)
+STEP 3 — Set up Google Sign-In (so you can actually log in)
 ---------------------------------------------------------------------
-Trankr emails you a 6-digit code when you register, to confirm the email
-is really yours. This uses Brevo's email API (not SMTP), since Render's
-free tier blocks outbound SMTP ports.
+1. Go to https://console.cloud.google.com/apis/credentials (create/select
+   any project when prompted — it's free, no billing needed for this)
+2. Click "Create Credentials" → "OAuth client ID"
+3. If prompted to configure the "OAuth consent screen" first, choose
+   "External", fill in an app name and your email, and save — you can
+   skip adding scopes/test users, this is just for your own use
+4. Application type: "Web application"
+5. Under "Authorized JavaScript origins", click "Add URI" and enter your
+   Render URL once you know it (Step 4 gives you this) — e.g.
+       https://your-app-name.onrender.com
+   You can also add http://localhost:8000 here for local testing.
+6. Click "Create" — copy the "Client ID" it shows you (keep it for
+   Step 4). You don't need the "Client secret" for this.
 
-1. Go to https://www.brevo.com and sign up for a free account
-   (no credit card needed)
-2. Go to Settings (top right) → SMTP & API → API Keys tab → "Generate a
-   new API key" → give it a name like "Trankr" → copy the key it shows
-   you (you only see it once — keep it for Step 4)
-3. Go to Senders, Domains & Dedicated IPs → Senders → "Add a sender" →
-   enter the email address you want Trankr to send from (e.g. your own
-   Gmail address) and confirm it via the verification email Brevo sends
-   — keep this address handy for Step 4
-4. Go to your account/organization name (top-right corner) → Settings →
-   Security → Authorized IPs tab. There are two separate toggles here,
-   "API keys" and "SMTP keys" — Trankr only uses the API, so just look
-   at the "API keys" row. If it shows "Activated", click "Deactivate
-   for API keys" (some accounts have this on by default, some don't —
-   if it's already off, nothing to do here). This prevents Brevo from
-   randomly rejecting emails when Render's outbound IP changes, which
-   it can do on the free tier.
+If you don't know your Render URL yet, you can create the OAuth client
+now with a placeholder origin and edit it later (Step 4) to add the real
+one — Google lets you edit authorized origins after creation.
 
 
 STEP 4 — Deploy the backend (Render)
@@ -79,9 +79,7 @@ STEP 4 — Deploy the backend (Render)
 
      DATABASE_URL   = (the Neon connection string from Step 2)
      SECRET_KEY     = (any random string — see note below)
-     BREVO_API_KEY  = (the API key from Step 3)
-     EMAIL_FROM     = (the verified sender address from Step 3)
-     EMAIL_FROM_NAME = Trankr
+     GOOGLE_CLIENT_ID = (the Client ID from Step 3)
      ALLOWED_EMAILS = (leave blank for an open instance — recommended
                         for your own self-hosted copy; set to your own
                         email, comma-separated for multiple, to lock
@@ -101,13 +99,18 @@ STEP 4 — Deploy the backend (Render)
 That's it — the backend also serves the app's interface directly, so this
 one URL is your whole app. No separate frontend hosting needed.
 
+IMPORTANT: go back to Google Cloud Console (Step 3) → your OAuth client
+→ "Authorized JavaScript origins" → add this Render URL if you hadn't
+already (must match exactly, including https://, no trailing slash).
+Without this, clicking "Continue with Google" will fail with an
+"origin mismatch" error.
 
-STEP 5 — Register your account
+
+STEP 5 — Sign in
 ------------------------------------
-Open your Render URL, register with your own email, and check that inbox
-for the verification code. By default registration is open to anyone who
-finds your URL — set ALLOWED_EMAILS (Step 4) if you want it locked to
-just your own email.
+Open your Render URL and click "Continue with Google." By default
+registration is open to anyone who finds your URL — set ALLOWED_EMAILS
+(Step 4) if you want it locked to just your own email.
 
 
 STEP 6 — Install it like an app on your phone
@@ -134,17 +137,52 @@ TROUBLESHOOTING
 - "This instance is private" error on registration → you're trying to
   register on someone else's deployed instance, not your own. Make sure
   you deployed your own fork and are using your own Render URL.
-- No verification email arriving → double-check BREVO_API_KEY is correct
-  and that EMAIL_FROM matches a sender you've verified in Brevo (Senders,
-  Domains & Dedicated IPs → Senders — unverified senders get rejected).
-  Check the Render logs too: a bad key or unverified sender raises a
-  clear "Brevo API error ..." message there.
-- Check your spam folder — first emails from a brand-new sender
-  sometimes land there.
-- Registration fails with a 500 error, and Render logs show "Brevo API
-  error 401" mentioning an "unrecognised IP address" → Brevo's IP
-  blocking is still on. Go to account name (top-right) → Settings →
-  Security → Authorized IPs and click "Deactivate for API keys" (see
-  Step 3), or manually add the IP shown in the log line.
+- "Continue with Google" button doesn't appear → GOOGLE_CLIENT_ID isn't
+  set on Render, or the page hasn't picked up the env var yet (redeploy
+  after adding it).
+- Clicking the Google button shows an "origin mismatch" / "idpiframe"
+  error → your Render URL isn't listed under "Authorized JavaScript
+  origins" for the OAuth client in Google Cloud Console (Step 3/4), or
+  it doesn't match exactly (check for a trailing slash or http vs https).
 - Server unreachable → Render free tier may just be waking up from idle,
   wait ~30 seconds and retry.
+
+
+APPENDIX — Optional email/OTP fallback (Brevo)
+----------------------------------------------------
+Trankr can still fall back to old-fashioned email+password with a 6-digit
+OTP code, in case you'd rather not use Google Sign-In. This is unused by
+default — if GOOGLE_CLIENT_ID is set, the Google button is all you need.
+
+Render's free tier blocks outbound SMTP ports, so this path sends the
+OTP via Brevo's HTTP email API instead of raw SMTP:
+
+1. Go to https://www.brevo.com and sign up for a free account
+2. Settings → SMTP & API → API Keys tab → "Generate a new API key" →
+   copy the key it shows you (only shown once)
+3. Senders, Domains & Dedicated IPs → Senders → "Add a sender" → enter
+   the address you want Trankr to send from and confirm it via Brevo's
+   verification email
+4. Account name (top-right) → Settings → Security → Authorized IPs →
+   if the "API keys" row shows "Activated", click "Deactivate for API
+   keys" (prevents Brevo rejecting mail when Render's outbound IP
+   changes)
+5. On Render, add these env vars alongside (or instead of)
+   GOOGLE_CLIENT_ID:
+     BREVO_API_KEY  = (the API key from step 2 above)
+     EMAIL_FROM     = (the verified sender address from step 3 above)
+     EMAIL_FROM_NAME = Trankr
+
+Troubleshooting this path specifically:
+- No verification email arriving → double-check BREVO_API_KEY is correct
+  and that EMAIL_FROM matches a sender you've verified in Brevo. Check
+  Render logs for a clear "Brevo API error ..." message.
+- Check your spam folder — first emails from a brand-new sender
+  sometimes land there.
+- 500 error with "Brevo API error 401" mentioning an "unrecognised IP
+  address" → Brevo's IP blocking is still on; see step 4 above.
+- If EMAIL_FROM is a @gmail.com (or other big-provider) address, expect
+  emails to be silently deferred/dropped no matter which provider you
+  use — those domains reject third-party senders by design (DMARC).
+  Use a domain you actually control DNS for, or just use Google
+  Sign-In instead and skip this whole appendix.
