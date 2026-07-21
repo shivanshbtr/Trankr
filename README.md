@@ -8,7 +8,7 @@ A full-stack personal productivity tracker for goals, milestones, habits, daily 
 ![PWA](https://img.shields.io/badge/installable-PWA-7c6dfa)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
-> **Note:** I run a personal, private instance of this app — registration there is restricted to my own account. The full source is available here for anyone who wants to run their own copy; see [`instruction_manual.txt`](./instruction_manual.txt) for a complete self-hosting walkthrough (free, no coding required).
+> **Note:** the author runs a personal, private instance of this app — registration there is restricted to their own account. The full source is available here for anyone who wants to run their own copy; see [`instruction_manual.txt`](./instruction_manual.txt) for a complete self-hosting walkthrough (free, no coding required).
 
 ---
 
@@ -48,7 +48,7 @@ trankr/
 │   ├── auth.py            JWT, password hashing, OTP generation
 │   ├── email_utils.py     Sends OTP verification emails via SMTP
 │   ├── routes/            goals, tasks, habits/journal/targets routers
-│   ├── runtime.txt        Pins Python version for deployment platforms (e.g. Render)
+│   ├── requirements.txt
 │   └── .env.example       Template for local secrets (never commit the real .env)
 ├── frontend/
 │   ├── index.html         Single-page app (all features)
@@ -80,8 +80,12 @@ Then open `http://localhost:8000` — the backend serves the frontend directly. 
 
 Interactive API docs (Swagger UI) are available at `/docs` once the server is running.
 
-## Future Enhancements Roadmap
+## Roadmap
 
 - [ ] AI-generated insights from tracked data
 - [ ] Data export/import
 - [ ] Mobile push notifications for habit reminders
+
+## License
+
+MIT
