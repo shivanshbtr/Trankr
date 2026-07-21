@@ -49,6 +49,7 @@ trankr/
 │   ├── email_utils.py     Sends OTP verification emails via SMTP
 │   ├── routes/            goals, tasks, habits/journal/targets routers
 │   ├── requirements.txt
+│   ├── runtime.txt        Pins Python version for deployment platforms (e.g. Render)
 │   └── .env.example       Template for local secrets (never commit the real .env)
 ├── frontend/
 │   ├── index.html         Single-page app (all features)
@@ -57,7 +58,6 @@ trankr/
 │   └── icons/
 ├── run.py                 One-command local launcher
 ├── instruction_manual.txt Self-hosting walkthrough for running your own copy
-├── runtime.txt            Pins Python version for deployment platforms (e.g. Render)
 ├── .gitignore
 └── README.md
 ```
@@ -79,7 +79,7 @@ Then open `http://localhost:8000` — the backend serves the frontend directly. 
 
 ## Deployment
 
-`runtime.txt` pins the Python version to 3.11.9 for platforms like Render that otherwise default to the latest Python. This avoids build failures from dependencies (e.g. `pydantic-core`) lacking prebuilt wheels for newer Python versions.
+`backend/runtime.txt` pins the Python version to 3.11.9 for platforms like Render that otherwise default to the latest Python. This avoids build failures from dependencies (e.g. `pydantic-core`) lacking prebuilt wheels for newer Python versions. On Render, make sure the service's Root Directory matches where `runtime.txt` lives (`backend/`), or set a `PYTHON_VERSION` environment variable instead.
 
 ## API
 
