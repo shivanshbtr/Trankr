@@ -56,7 +56,8 @@ STEP 4 — Deploy the backend (Render)
 3. Root directory: backend
 4. Build command:   pip install -r requirements.txt
 5. Start command:   uvicorn main:app --host 0.0.0.0 --port $PORT
-6. Add these environment variables:
+6. Add these environment variables (see backend/.env.example for the
+   full reference):
 
      DATABASE_URL   = (the Neon connection string from Step 2)
      SECRET_KEY     = (any random string — see note below)
@@ -65,6 +66,13 @@ STEP 4 — Deploy the backend (Render)
      SMTP_USER      = (the Gmail address from Step 3)
      SMTP_PASSWORD  = (the 16-character app password from Step 3)
      SMTP_FROM      = (same Gmail address)
+     ALLOWED_EMAILS = (leave blank for an open instance — recommended
+                        for your own self-hosted copy; set to your own
+                        email, comma-separated for multiple, to lock
+                        registration to yourself only)
+     PYTHON_VERSION = 3.11.9 (only needed if the build fails with a
+                        Python version/compilation error — pins Render
+                        to a stable Python version)
 
    For SECRET_KEY, use any long random string. If you have Python installed,
    this command generates one:
@@ -81,9 +89,9 @@ one URL is your whole app. No separate frontend hosting needed.
 STEP 5 — Register your account
 ------------------------------------
 Open your Render URL, register with your own email, and check that inbox
-for the verification code. You're now the only person who can use this
-instance (registration is closed to any other email by default unless you
-configure ALLOWED_EMAILS otherwise — see backend/.env.example).
+for the verification code. By default registration is open to anyone who
+finds your URL — set ALLOWED_EMAILS (Step 4) if you want it locked to
+just your own email.
 
 
 STEP 6 — Install it like an app on your phone
