@@ -17,7 +17,7 @@ class User(Base):
     id           = Column(Integer, primary_key=True, index=True)
     name         = Column(String(100), nullable=False)
     email        = Column(String(200), unique=True, index=True, nullable=False)
-    hashed_pw    = Column(String(200), nullable=False)
+    hashed_pw    = Column(String(200), nullable=True)   # null for Google-only accounts
     created_at   = Column(DateTime, default=datetime.utcnow)
 
     is_verified      = Column(Boolean, default=False, nullable=False)
