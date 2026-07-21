@@ -1471,10 +1471,36 @@ function switchAuthTab(mode) {
 // Set up Google Sign-In: ask the backend for the Client ID (kept out of
 // this static file so self-hosters configure it via env var, not by
 // editing frontend code), then render the button if it's configured.
+//
+// Google's script tag loads with async/defer, so it can still be loading
+// when this runs — poll briefly for window.google instead of bailing on
+// the first check, or the button silently never appears depending on
+// network timing.
+function waitForGoogleScript(timeoutMs = 4000, intervalMs = 100) {
+  return new Promise(resolve => {
+    const start = Date.now();
+    (function poll() {
+      if (window.google && window.google.accounts && window.google.accounts.id) {
+        resolve(true);
+      } else if (Date.now() - start > timeoutMs) {
+        resolve(false);
+      } else {
+        setTimeout(poll, intervalMs);
+      }
+    })();
+  });
+}
+
 (async function initGoogleSignIn() {
   try {
     const cfg = await API.authConfig();
-    if (!cfg || !cfg.google_client_id || !window.google) return;
+    if (!cfg || !cfg.google_client_id) return;   // not configured on this server
+
+    const googleReady = await waitForGoogleScript();
+    if (!googleReady) {
+      console.warn('Trankr: Google Sign-In script failed to load in time.');
+      return;
+    }
 
     google.accounts.id.initialize({
       client_id: cfg.google_client_id,
@@ -1486,7 +1512,8 @@ function switchAuthTab(mode) {
     );
     document.getElementById('googleAuthWrap').style.display = 'block';
   } catch (e) {
-    // No backend / not configured — just keep email+password auth only.
+    // No backend reachable — just keep email+password auth only.
+    console.warn('Trankr: could not initialize Google Sign-In:', e);
   }
 })();
 
