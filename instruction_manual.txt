@@ -1,0 +1,117 @@
+TRANKR — SELF-HOSTING GUIDE
+=============================
+This is a personal instance of Trankr and registration is restricted to
+its owner. If you'd like to use Trankr yourself, the full source is here
+for you to run your own copy — for free, in a few minutes. No coding
+knowledge required, just follow the steps below.
+
+
+WHAT YOU'LL END UP WITH
+----------------------------
+Your own private Trankr, running on your own server and database, with
+your own login — installable on your phone and laptop like an app.
+
+
+REQUIREMENTS
+----------------
+- A free GitHub account (to hold your copy of the code)
+- A free Render account (render.com) — runs the app
+- A free Neon account (neon.tech) — stores your data
+- A free Gmail account (or any email) — sends your login verification codes
+No credit card is required for any of these at the free tier used here.
+
+
+STEP 1 — Get your own copy of the code
+-------------------------------------------
+On GitHub, click "Fork" on this repository (top-right of the repo page).
+This creates your own copy under your account, e.g.
+    github.com/YOUR-USERNAME/trankr
+
+
+STEP 2 — Create a free database
+------------------------------------
+1. Go to neon.tech and sign up (no credit card needed)
+2. Create a new project
+3. Copy the connection string it gives you — looks like:
+       postgresql://user:password@host/dbname
+   Keep this handy for Step 4.
+
+
+STEP 3 — Set up email verification (so you can actually log in)
+---------------------------------------------------------------------
+Trankr emails you a 6-digit code when you register, to confirm the email
+is really yours. Easiest option — a Gmail App Password:
+
+1. On the Gmail account you want to send from: Google Account → Security
+   → turn on "2-Step Verification" (required first)
+2. Go to https://myaccount.google.com/apppasswords
+3. Under "App name," type "Trankr" → Create
+4. Copy the 16-character password it gives you — keep it for Step 4
+
+
+STEP 4 — Deploy the backend (Render)
+------------------------------------------
+1. Go to render.com and sign up, connect your GitHub account
+2. New → Web Service → select your forked repo
+3. Root directory: backend
+4. Build command:   pip install -r requirements.txt
+5. Start command:   uvicorn main:app --host 0.0.0.0 --port $PORT
+6. Add these environment variables:
+
+     DATABASE_URL   = (the Neon connection string from Step 2)
+     SECRET_KEY     = (any random string — see note below)
+     SMTP_HOST      = smtp.gmail.com
+     SMTP_PORT      = 587
+     SMTP_USER      = (the Gmail address from Step 3)
+     SMTP_PASSWORD  = (the 16-character app password from Step 3)
+     SMTP_FROM      = (same Gmail address)
+
+   For SECRET_KEY, use any long random string. If you have Python installed,
+   this command generates one:
+       python -c "import secrets; print(secrets.token_hex(32))"
+   If not, any long random password-like string works fine too.
+
+7. Deploy. Render gives you a URL like:
+       https://your-app-name.onrender.com
+
+That's it — the backend also serves the app's interface directly, so this
+one URL is your whole app. No separate frontend hosting needed.
+
+
+STEP 5 — Register your account
+------------------------------------
+Open your Render URL, register with your own email, and check that inbox
+for the verification code. You're now the only person who can use this
+instance (registration is closed to any other email by default unless you
+configure ALLOWED_EMAILS otherwise — see backend/.env.example).
+
+
+STEP 6 — Install it like an app on your phone
+----------------------------------------------------
+Open your Render URL on your phone's browser:
+- Android (Chrome): menu → "Add to Home screen" / "Install app"
+- iOS (Safari): Share icon → "Add to Home Screen"
+
+It'll install as a real app icon and open full-screen.
+
+
+NOTES
+---------
+- Render's free tier spins down after ~15 minutes of inactivity — the
+  first request after a break takes ~30 seconds to wake up. Normal.
+- Neon's free tier gives 0.5 GB of storage, which is far more than a
+  personal instance will use even after years of daily use.
+- Your data belongs to you — this is your own Postgres database, and you
+  can export or delete it at any time from your Neon dashboard.
+
+
+TROUBLESHOOTING
+--------------------
+- "This instance is private" error on registration → you're trying to
+  register on someone else's deployed instance, not your own. Make sure
+  you deployed your own fork and are using your own Render URL.
+- No verification email arriving → double-check SMTP_USER/SMTP_PASSWORD
+  are correct, and that you generated an App Password (not your normal
+  Gmail password — Gmail blocks direct password login for security).
+- Server unreachable → Render free tier may just be waking up from idle,
+  wait ~30 seconds and retry.
