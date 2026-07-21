@@ -28,6 +28,9 @@ class LoginRequest(BaseModel):
     email:    EmailStr
     password: str
 
+class GoogleAuthRequest(BaseModel):
+    credential: str   # the ID token returned by Google Identity Services
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type:   str = "bearer"
