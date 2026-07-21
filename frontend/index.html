@@ -436,6 +436,7 @@ a{text-decoration:none;color:inherit}
 }
 .cal-day:hover{border-color:var(--border2);background:var(--surface2)}
 .cal-day.today{border-color:var(--accent)!important;background:rgba(124,109,250,0.1)!important}
+.cal-day.selected{border-color:#3b82f6!important;background:rgba(59,130,246,0.18)!important;box-shadow:0 0 0 1px #3b82f6 inset}
 .cal-day.other-month{opacity:0.3}
 .cal-day-num{font-size:13px;font-weight:600}
 .cal-day-dot{width:4px;height:4px;border-radius:50%}
@@ -2641,6 +2642,13 @@ async function toggleHabit(habitId, date) {
   renderHabits();
 }
 
+function openHabitModal() {
+  document.getElementById('habitName').value = '';
+  document.getElementById('habitIcon').value = '';
+  document.getElementById('habitCategory').value = 'Health';
+  openModal('habitModal');
+}
+
 async function saveHabit() {
   const name = document.getElementById('habitName').value.trim();
   if (!name) return toast('Habit name required', 'error');
@@ -2703,6 +2711,7 @@ async function saveJournal() {
    CALENDAR
    ============================================================ */
 let calDate = new Date();
+let selectedCalDate = null;   // ds of the day the user last clicked, if any
 
 function renderCalendar() {
   const year = calDate.getFullYear(), month = calDate.getMonth();
@@ -2730,8 +2739,9 @@ function renderCalendar() {
       const pct = done / total;
       cls = pct >= 1 ? 'green-day' : pct >= 0.5 ? 'yellow-day' : 'red-day';
     }
-    const isToday = ds === today;
-    html += `<div class="cal-day ${cls} ${isToday?'today':''}" onclick="showCalDay('${ds}')">
+    const isToday    = ds === today;
+    const isSelected = ds === selectedCalDate;
+    html += `<div class="cal-day ${cls} ${isToday?'today':''} ${isSelected?'selected':''}" data-date="${ds}" onclick="showCalDay('${ds}')">
       <span class="cal-day-num">${d}</span>
       ${total > 0 ? `<span style="font-size:9px;color:var(--text3)">${done}/${total}</span>` : ''}
     </div>`;
@@ -2740,6 +2750,15 @@ function renderCalendar() {
 }
 
 function showCalDay(ds) {
+  // Move the "selected" highlight to the clicked day. Do this on the
+  // existing DOM nodes (not a full renderCalendar()) so it's instant and
+  // doesn't lose scroll position; renderCalendar() also honors
+  // selectedCalDate so it stays correct after any later re-render.
+  selectedCalDate = ds;
+  document.querySelectorAll('.cal-day.selected').forEach(el => el.classList.remove('selected'));
+  const dayEl = document.querySelector(`.cal-day[data-date="${ds}"]`);
+  if (dayEl) dayEl.classList.add('selected');
+
   const tasks = state.tasks[ds] || [];
   const detail = document.getElementById('calDayDetail');
   const content = document.getElementById('calDayDetailContent');
