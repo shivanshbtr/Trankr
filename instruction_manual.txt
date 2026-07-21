@@ -57,11 +57,12 @@ free tier blocks outbound SMTP ports.
    enter the email address you want Trankr to send from (e.g. your own
    Gmail address) and confirm it via the verification email Brevo sends
    — keep this address handy for Step 4
-4. Go to https://app.brevo.com/security/authorised_ips and turn OFF
-   "Authorize IP addresses for API access". Render's free tier doesn't
-   use a fixed IP, so if this is left on, Brevo will reject every email
-   with a 401 error the first time it sees a new IP (which can happen
-   again after any redeploy).
+4. Go to your account/organization name (top-right corner) → Settings →
+   Security → Authorized IPs tab. If it shows blocking as active, click
+   "Deactivate blocking" (some accounts have this on by default, some
+   don't — if it's already off, nothing to do here). This prevents
+   Brevo from randomly rejecting emails when Render's outbound IP
+   changes, which it can do on the free tier.
 
 
 STEP 4 — Deploy the backend (Render)
@@ -140,9 +141,8 @@ TROUBLESHOOTING
   sometimes land there.
 - Registration fails with a 500 error, and Render logs show "Brevo API
   error 401" mentioning an "unrecognised IP address" → Brevo's IP
-  authorization is still on. Go to
-  https://app.brevo.com/security/authorised_ips and either add the IP
-  shown in the error, or turn the setting off entirely (see Step 3.4)
-  so this doesn't recur after future redeploys.
+  blocking is still on. Go to account name (top-right) → Settings →
+  Security → Authorized IPs and click "Deactivate blocking" (see
+  Step 3), or manually add the IP shown in the log line.
 - Server unreachable → Render free tier may just be waking up from idle,
   wait ~30 seconds and retry.
