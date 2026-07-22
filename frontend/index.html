@@ -2507,10 +2507,26 @@ async function toggleTask(date, taskId) {
   save();
   // API call
   await API.toggleTask(taskId);
+
   if (t.goalId) {
     const goal = state.goals.find(g => g.id === t.goalId);
-    if (goal) checkMilestoneCompletion(goal, t.goalId);
+    if (goal) {
+      const milestone = t.milestoneId ? (goal.milestones || []).find(m => m.id === t.milestoneId) : null;
+      if (t.done && milestone) {
+        const mp = calcMilestoneProgress(milestone, t.goalId);
+        // Only show the progress toast if this isn't the task that just hit
+        // 100% — checkMilestoneCompletion below already shows the 🎉 toast
+        // for that case, so we don't want to double up.
+        if (mp < 100) toast(`✅ Task done — "${milestone.name}" now ${mp}% complete`, 'success');
+      } else if (t.done) {
+        toast('Task completed! ✅', 'success');
+      }
+      checkMilestoneCompletion(goal, t.goalId);
+    }
+  } else if (t.done) {
+    toast('Task completed! ✅', 'success');
   }
+
   renderTasks();
   if (currentPage === 'dashboard') renderDashboard();
 }
