@@ -82,6 +82,7 @@ class Task(Base):
     notes        = Column(Text, default="")
     goal_id      = Column(String(36), ForeignKey("goals.id"), nullable=True)
     milestone_id = Column(String(36), ForeignKey("milestones.id"), nullable=True)
+    milestone_contribution = Column(Float, nullable=True)  # % of milestone this task completes when done
     sort_order   = Column(Integer, default=0)
     created_at   = Column(DateTime, default=datetime.utcnow)
 
