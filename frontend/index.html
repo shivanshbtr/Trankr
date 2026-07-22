@@ -1718,12 +1718,13 @@ function logout() {
 async function loadAllFromServer() {
   try {
     // Parallel fetch everything
-    const [goals, tasks365, habits, habitLogs, journals] = await Promise.all([
+    const [goals, tasks365, habits, habitLogs, journals, todayTarget] = await Promise.all([
       API.getGoals(),
       fetchRecentTasks(),
       API.getHabits(),
       fetchRecentHabitLogs(),
       API.getJournals(),
+      API.getTarget(todayStr()),
     ]);
 
     if (goals)     convertGoalsToState(goals);
@@ -1731,6 +1732,11 @@ async function loadAllFromServer() {
     if (habits)    state.habits = habits.map(normalizeHabit);
     if (habitLogs) mergeHabitLogs(habitLogs);
     if (journals)  mergeJournals(journals);
+    // Always set this device's copy of today's target from the server,
+    // even when null — otherwise a target saved from another device
+    // never appears here, and clearing a target on the server wouldn't
+    // clear it locally either.
+    state.targets[todayStr()] = todayTarget || {};
 
     setApiStatus(true);
   } catch(e) {
