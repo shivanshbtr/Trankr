@@ -27,6 +27,19 @@ from routes.habits import router as habits_router
 # ── Create all tables ─────────────────────────────────────────────────────────
 Base.metadata.create_all(bind=engine)
 
+# ── Lightweight migration: add columns that were introduced after the initial
+#    release, so existing local trankr.db files don't need to be deleted. ────
+def _ensure_column(table: str, column: str, coltype: str):
+    with engine.connect() as conn:
+        from sqlalchemy import text
+        existing = [row[1] for row in conn.execute(text(f"PRAGMA table_info({table})"))]
+        if column not in existing:
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {coltype}"))
+            conn.commit()
+
+if engine.url.get_backend_name() == "sqlite":
+    _ensure_column("tasks", "milestone_contribution", "FLOAT")
+
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(
     title       = "Trankr API",
