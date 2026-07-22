@@ -2377,13 +2377,15 @@ async function deleteMilestone(goalId, milestoneId) {
 }
 
 function checkMilestoneCompletion(goal, goalId) {
-  (goal.milestones || []).forEach(m => {
+  (goal.milestones || []).forEach(async m => {
     const mp = calcMilestoneProgress(m, goalId);
     if (mp === 100 && !m.celebrated) {
       m.celebrated = true;
       save();
       launchConfetti();
       toast(`🎉 Milestone "${m.name}" completed!`, 'success');
+      try { await API.celebrateMilestone(goalId, m.id); }
+      catch (e) { /* non-fatal — worst case the toast can refire once more */ }
     }
   });
 }
