@@ -2726,6 +2726,7 @@ async function deleteHabit(id) {
    JOURNAL
    ============================================================ */
 let journalEditDate = null;   // date currently loaded into the editable boxes
+let journalOlderLimit = 10;   // how many older-than-7-days entries to show; grows via "Load more"
 
 function loadJournalIntoForm(date) {
   const j = state.journals[date] || {};
@@ -2737,6 +2738,7 @@ function loadJournalIntoForm(date) {
 function renderJournal() {
   const today = todayStr();
   journalEditDate = today;   // landing on the page always starts at today
+  journalOlderLimit = 10;    // reset pagination on a fresh visit to the page
   editJournalEntry(journalEditDate, /*skipListRebuild*/ true);
   renderJournalEntriesList();
 }
@@ -2762,33 +2764,15 @@ function editJournalEntry(date, skipListRebuild) {
 function renderJournalEntriesList() {
   const today = todayStr();
   const entriesEl = document.getElementById('journalEntries');
+  const hasContent = e => e && (e.thoughts || e.ideas || e.mood);
 
-  // Rolling 7-day window (today back to 6 days ago) — every day in this
-  // window gets a row, real entry or a "Nothing journalized" placeholder,
-  // so a missed day is visible instead of silently disappearing.
-  const windowDays = [];
-  for (let i = 0; i < 7; i++) {
-    const d = parseDate(today);
-    d.setDate(d.getDate() - i);
-    windowDays.push(fmtDate(d));
-  }
-
-  // Real entries older than the window, shown without gap-filling.
-  const olderDates = Object.keys(state.journals)
-    .filter(d => !windowDays.includes(d))
-    .sort((a, b) => b.localeCompare(a))
-    .slice(0, 10);
-
-  const allDates = [...windowDays, ...olderDates];
-
-  entriesEl.innerHTML = allDates.map(date => {
+  const renderRow = (date) => {
     const e = state.journals[date];
     const isToday = date === today;
-    const hasContent = e && (e.thoughts || e.ideas || e.mood);
     const label = (isToday ? 'Today · ' : '') + fmtDisplayDate(date);
     const isSelected = date === journalEditDate;
 
-    if (!hasContent) {
+    if (!hasContent(e)) {
       return `<div class="journal-entry journal-entry-empty ${isSelected ? 'selected' : ''}" data-date="${date}" onclick="editJournalEntry('${date}')">
         <div class="journal-date">${label}</div>
         <div class="journal-text">Nothing journalized on ${fmtDisplayDate(date)}</div>
@@ -2798,7 +2782,28 @@ function renderJournalEntriesList() {
       <div class="journal-date">${label} ${e.mood || ''}</div>
       ${e.thoughts ? `<div class="journal-text">${escHtml(e.thoughts)}</div>` : ''}
     </div>`;
-  }).join('');
+  };
+
+  // Every other date only shows if it actually has a real entry — the
+  // date is already visible on each row, so a run of empty placeholders
+  // for undocumented days doesn't add anything. Today is the one
+  // exception: it always shows, real entry or not, so it's obvious
+  // where "today's row" is and that saving will land there.
+  const allOtherDates = Object.keys(state.journals)
+    .filter(d => d !== today && hasContent(state.journals[d]))
+    .sort((a, b) => b.localeCompare(a));
+  const shownOtherDates = allOtherDates.slice(0, journalOlderLimit);
+  const hasMore = allOtherDates.length > shownOtherDates.length;
+
+  entriesEl.innerHTML = [today, ...shownOtherDates].map(renderRow).join('')
+    + (hasMore ? `<div style="text-align:center;margin-top:10px">
+         <button class="btn btn-sm" onclick="loadMoreJournalEntries()">Load more entries</button>
+       </div>` : '');
+}
+
+function loadMoreJournalEntries() {
+  journalOlderLimit += 10;
+  renderJournalEntriesList();
 }
 
 async function saveJournal() {
