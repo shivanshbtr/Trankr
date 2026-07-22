@@ -28,17 +28,27 @@ from routes.habits import router as habits_router
 Base.metadata.create_all(bind=engine)
 
 # ── Lightweight migration: add columns that were introduced after the initial
-#    release, so existing local trankr.db files don't need to be deleted. ────
-def _ensure_column(table: str, column: str, coltype: str):
+#    release, so existing databases (local trankr.db or the Postgres instance
+#    on Render) don't need to be wiped/recreated. ─────────────────────────────
+def _ensure_column(table: str, column: str, sqlite_type: str, postgres_type: str):
+    from sqlalchemy import text
+    backend = engine.url.get_backend_name()
     with engine.connect() as conn:
-        from sqlalchemy import text
-        existing = [row[1] for row in conn.execute(text(f"PRAGMA table_info({table})"))]
-        if column not in existing:
-            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {coltype}"))
-            conn.commit()
+        if backend == "sqlite":
+            existing = [row[1] for row in conn.execute(text(f"PRAGMA table_info({table})"))]
+            if column not in existing:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {sqlite_type}"))
+                conn.commit()
+        elif backend.startswith("postgres"):
+            existing = [row[0] for row in conn.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = :table"
+            ), {"table": table})]
+            if column not in existing:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {postgres_type}"))
+                conn.commit()
 
-if engine.url.get_backend_name() == "sqlite":
-    _ensure_column("tasks", "milestone_contribution", "FLOAT")
+_ensure_column("tasks", "milestone_contribution", "FLOAT", "DOUBLE PRECISION")
 
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(
