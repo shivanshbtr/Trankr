@@ -42,6 +42,7 @@ def create_task(body: schemas.TaskIn, user=Depends(get_current_user), db: Sessio
         notes        = body.notes or "",
         goal_id      = body.goal_id or None,
         milestone_id = body.milestone_id or None,
+        milestone_contribution = body.milestone_contribution,
         sort_order   = body.sort_order or 0,
     )
     db.add(task); db.commit(); db.refresh(task)
@@ -63,6 +64,7 @@ def update_task(task_id: str, body: schemas.TaskIn,
     task.notes        = body.notes or ""
     task.goal_id      = body.goal_id or None
     task.milestone_id = body.milestone_id or None
+    task.milestone_contribution = body.milestone_contribution
     task.sort_order   = body.sort_order or 0
     db.commit(); db.refresh(task)
     return task
