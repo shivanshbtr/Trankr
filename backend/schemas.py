@@ -85,6 +85,7 @@ class TaskIn(BaseModel):
     notes:        Optional[str] = ""
     goal_id:      Optional[str] = None
     milestone_id: Optional[str] = None
+    milestone_contribution: Optional[float] = None
     sort_order:   Optional[int] = 0
 
 class TaskOut(TaskIn):
