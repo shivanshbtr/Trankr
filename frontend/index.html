@@ -1284,6 +1284,10 @@ select.form-input{appearance:none;cursor:pointer}
       </div>
       <div class="form-group"><div class="form-label">Linked Milestone</div>
         <select class="form-input" id="taskMilestoneLink"><option value="">None</option></select></div>
+      <div class="form-group" id="taskMilestoneContributionGroup" style="display:none">
+        <div class="form-label">Contributes to milestone (%)</div>
+        <input class="form-input" type="number" id="taskMilestoneContribution" min="0" max="100" step="1" placeholder="Leave blank to split evenly"/>
+      </div>
       <div class="form-group"><div class="form-label">Notes</div>
         <textarea class="form-input" id="taskNotes" rows="2" placeholder="Any notes…" style="resize:vertical"></textarea></div>
       <div class="form-footer">
@@ -1794,6 +1798,7 @@ function normalizeTask(t) {
     notes:       t.notes,
     goalId:      t.goal_id,
     milestoneId: t.milestone_id,
+    milestoneContribution: (t.milestone_contribution === undefined) ? null : t.milestone_contribution,
     sortOrder:   t.sort_order,
   };
 }
@@ -1938,16 +1943,30 @@ function renderPage(page) {
    PROGRESS CALCULATION
    ============================================================ */
 function calcMilestoneProgress(milestone, goalId) {
-  const today = todayStr();
   const allDays = Object.keys(state.tasks);
-  let total = 0, done = 0;
+  const linkedTasks = [];
   allDays.forEach(day => {
     (state.tasks[day] || []).forEach(t => {
-      if (t.milestoneId === milestone.id) { total++; if (t.done) done++; }
+      if (t.milestoneId === milestone.id) linkedTasks.push(t);
     });
   });
-  if (total === 0) return milestone.manualProgress || 0;
-  return Math.round((done / total) * 100);
+  if (linkedTasks.length === 0) return milestone.manualProgress || 0;
+
+  // Tasks can carry an explicit % contribution toward the milestone. Any
+  // task without one splits the remaining weight evenly (old behavior).
+  const hasContribution = t => t.milestoneContribution !== null && t.milestoneContribution !== undefined && t.milestoneContribution !== '';
+  const explicitTasks = linkedTasks.filter(hasContribution);
+  const implicitTasks = linkedTasks.filter(t => !hasContribution(t));
+  const explicitSum = explicitTasks.reduce((s, t) => s + Number(t.milestoneContribution), 0);
+  const remaining = Math.max(0, 100 - explicitSum);
+  const implicitShare = implicitTasks.length ? remaining / implicitTasks.length : 0;
+
+  let progress = 0;
+  linkedTasks.forEach(t => {
+    const weight = hasContribution(t) ? Number(t.milestoneContribution) : implicitShare;
+    if (t.done) progress += weight;
+  });
+  return Math.min(100, Math.round(progress));
 }
 
 function calcGoalProgress(goal) {
@@ -2504,6 +2523,7 @@ function openTaskModal(taskId) {
   goalSel.innerHTML = '<option value="">None</option>' + state.goals.map(g =>
     `<option value="${g.id}">${escHtml(g.name)}</option>`).join('');
   document.getElementById('taskMilestoneLink').innerHTML = '<option value="">None</option>';
+  toggleMilestoneContributionField();
 
   if (taskId) {
     const tasks = state.tasks[plannerDate] || [];
@@ -2515,7 +2535,10 @@ function openTaskModal(taskId) {
       document.getElementById('taskEstTime').value = t.estTime || '';
       document.getElementById('taskGoalLink').value = t.goalId || '';
       document.getElementById('taskNotes').value = t.notes || '';
+      document.getElementById('taskMilestoneContribution').value =
+        (t.milestoneContribution === null || t.milestoneContribution === undefined) ? '' : t.milestoneContribution;
       if (t.goalId) populateMilestoneSelect(t.goalId, t.milestoneId);
+      toggleMilestoneContributionField();
     }
   } else {
     document.getElementById('taskName').value = '';
@@ -2524,13 +2547,23 @@ function openTaskModal(taskId) {
     document.getElementById('taskEstTime').value = '';
     document.getElementById('taskGoalLink').value = '';
     document.getElementById('taskNotes').value = '';
+    document.getElementById('taskMilestoneContribution').value = '';
   }
   openModal('taskModal');
 }
 
 document.getElementById('taskGoalLink').addEventListener('change', function() {
   populateMilestoneSelect(this.value, '');
+  toggleMilestoneContributionField();
 });
+
+document.getElementById('taskMilestoneLink').addEventListener('change', toggleMilestoneContributionField);
+
+function toggleMilestoneContributionField() {
+  const hasMilestone = !!document.getElementById('taskMilestoneLink').value;
+  document.getElementById('taskMilestoneContributionGroup').style.display = hasMilestone ? '' : 'none';
+  if (!hasMilestone) document.getElementById('taskMilestoneContribution').value = '';
+}
 
 function populateMilestoneSelect(goalId, selectedId) {
   const sel = document.getElementById('taskMilestoneLink');
@@ -2546,6 +2579,15 @@ async function saveTask() {
   const name = document.getElementById('taskName').value.trim();
   if (!name) return toast('Task name required', 'error');
   const taskId = document.getElementById('editTaskId').value;
+  const milestoneId = document.getElementById('taskMilestoneLink').value || null;
+  const contributionRaw = document.getElementById('taskMilestoneContribution').value;
+  let milestoneContribution = null;
+  if (milestoneId && contributionRaw !== '') {
+    milestoneContribution = parseFloat(contributionRaw);
+    if (isNaN(milestoneContribution) || milestoneContribution < 0 || milestoneContribution > 100) {
+      return toast('Milestone contribution must be between 0 and 100', 'error');
+    }
+  }
   const payload = {
     task_date:    plannerDate,
     name,
@@ -2553,7 +2595,8 @@ async function saveTask() {
     deadline:     document.getElementById('taskDeadline').value,
     est_time:     parseFloat(document.getElementById('taskEstTime').value) || 0,
     goal_id:      document.getElementById('taskGoalLink').value || null,
-    milestone_id: document.getElementById('taskMilestoneLink').value || null,
+    milestone_id: milestoneId,
+    milestone_contribution: milestoneId ? milestoneContribution : null,
     notes:        document.getElementById('taskNotes').value.trim(),
     done:         false,
   };
