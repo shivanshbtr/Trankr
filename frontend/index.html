@@ -2531,11 +2531,11 @@ async function toggleTask(date, taskId) {
         try { await API.celebrateMilestone(t.goalId, milestone.id); }
         catch (e) { /* non-fatal */ }
       } else if (mp < 100) {
-        toast(`✅ Task done — "${milestone.name}" now ${mp}% complete`, 'success');
+        toast(`Task done — "${milestone.name}" now ${mp}% complete`, 'success');
       }
       // mp === 100 but already celebrated earlier: no toast, avoids repeats.
     } else {
-      toast('Task completed! ✅', 'success');
+      toast('Task completed!', 'success');
     }
   }
 
@@ -2640,7 +2640,7 @@ async function saveTask() {
     } else {
       const created = await API.createTask(payload);
       if (created) state.tasks[plannerDate].push(normalizeTask(created));
-      toast('Task added! ✅', 'success');
+      toast('Task added!', 'success');
     }
   } catch(e) { toast(e.message, 'error'); return; }
   save(); closeModal('taskModal'); renderTasks();
@@ -3238,7 +3238,7 @@ function exportJSON() {
   a.href = URL.createObjectURL(blob);
   a.download = `trankr-data-${todayStr()}.json`;
   a.click();
-  toast('JSON exported ✅', 'success');
+  toast('JSON exported', 'success');
 }
 
 function exportCSV() {
@@ -3256,7 +3256,7 @@ function exportCSV() {
   a.href = URL.createObjectURL(blob);
   a.download = `trankr-tasks-${todayStr()}.csv`;
   a.click();
-  toast('CSV exported ✅', 'success');
+  toast('CSV exported', 'success');
 }
 
 /* ============================================================
