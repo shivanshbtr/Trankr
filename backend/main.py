@@ -303,20 +303,32 @@ if os.path.isdir(frontend_dir):
 
 
 # ── Health check ─────────────────────────────────────────────────────────────
-# Also runs a trivial DB query, so a keep-alive ping to this endpoint prevents
-# both Render's web-service spin-down AND Neon's free-tier compute suspension
-# (Neon suspends its compute after a period of no queries; this keeps it warm).
+# Deliberately does NOT touch the database. This is the endpoint the self-ping
+# loop below calls every 10 min to stop Render's free tier from spinning down.
+# If this queried the DB, it would also stop Neon's free-tier compute from
+# ever scaling to zero — which burns through Neon's 100 CU-hour/month cap in
+# ~16-17 days instead of a full month. Neon's cold start from scale-to-zero is
+# ~0.5-2s, fast enough that it's better to just let it sleep between real use.
 @app.get("/health", tags=["Meta"])
-def health(db: Session = Depends(get_db)):
-    db.execute(text("SELECT 1"))
+def health():
     return {"status": "ok", "app": "Trankr"}
+
+
+# Optional deeper check that does touch the DB — useful for manually
+# confirming DB connectivity, but NOT pinged automatically, so it doesn't
+# affect Neon's compute-hour usage.
+@app.get("/health/db", tags=["Meta"])
+def health_db(db: Session = Depends(get_db)):
+    db.execute(text("SELECT 1"))
+    return {"status": "ok", "app": "Trankr", "db": "connected"}
 
 
 # ── Self-ping keep-alive (optional) ────────────────────────────────────────────
 # If SELF_URL is set (see .env.example), the app pings its own /health endpoint
 # every 10 minutes from a background thread. This is enough to stop Render's
-# free-tier web service from spinning down after 15 minutes of inactivity, and
-# since /health now touches the DB, it keeps Neon's compute warm too.
+# free-tier web service from spinning down after 15 minutes of inactivity.
+# Deliberately pings /health (no DB) rather than /health/db, so it doesn't
+# also keep Neon's compute running 24/7 and burn its free monthly CU-hours.
 # Leave SELF_URL unset to disable this entirely (e.g. for local dev).
 SELF_URL = os.getenv("SELF_URL", "").rstrip("/")
 KEEP_ALIVE_INTERVAL_SECONDS = int(os.getenv("KEEP_ALIVE_INTERVAL_SECONDS", "600"))  # 10 min
