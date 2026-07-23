@@ -24,6 +24,12 @@ connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite")
 engine = create_engine(
     DATABASE_URL,
     connect_args=connect_args,
+    pool_pre_ping=True,   # test each connection before use; transparently
+                           # reconnects if the DB (e.g. Neon after a suspend)
+                           # silently dropped it, instead of raising an error
+    pool_recycle=300,     # also proactively recycle connections older than
+                           # 5 min, so idle ones don't get a chance to go
+                           # stale between requests
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
