@@ -1943,28 +1943,35 @@ function renderPage(page) {
    PROGRESS CALCULATION
    ============================================================ */
 function calcMilestoneProgress(milestone, goalId) {
+  const today = todayStr();
   const allDays = Object.keys(state.tasks);
   const linkedTasks = [];
   allDays.forEach(day => {
     (state.tasks[day] || []).forEach(t => {
-      if (t.milestoneId === milestone.id) linkedTasks.push(t);
+      if (t.milestoneId === milestone.id) linkedTasks.push({ task: t, day });
     });
   });
   if (linkedTasks.length === 0) return milestone.manualProgress || 0;
 
   // Tasks can carry an explicit % contribution toward the milestone. Any
-  // task without one splits the remaining weight evenly (old behavior).
-  const hasContribution = t => t.milestoneContribution !== null && t.milestoneContribution !== undefined && t.milestoneContribution !== '';
-  const explicitTasks = linkedTasks.filter(hasContribution);
-  const implicitTasks = linkedTasks.filter(t => !hasContribution(t));
-  const explicitSum = explicitTasks.reduce((s, t) => s + Number(t.milestoneContribution), 0);
+  // task without one splits the remaining weight among "active" blank
+  // tasks — done tasks always count, and not-yet-done tasks from TODAY
+  // still reserve their slice (so finishing a same-day sibling doesn't
+  // falsely spike the milestone to 100%). A blank task left unchecked from
+  // a PAST day is considered stale and drops out of the split entirely —
+  // it no longer dilutes credit for work you've actually finished.
+  const hasContribution = ({ task }) => task.milestoneContribution !== null && task.milestoneContribution !== undefined && task.milestoneContribution !== '';
+  const explicitSum = linkedTasks.filter(hasContribution).reduce((s, { task }) => s + Number(task.milestoneContribution), 0);
   const remaining = Math.max(0, 100 - explicitSum);
-  const implicitShare = implicitTasks.length ? remaining / implicitTasks.length : 0;
+  const activeImplicitTasks = linkedTasks.filter(entry =>
+    !hasContribution(entry) && (entry.task.done || entry.day >= today)
+  );
+  const implicitShare = activeImplicitTasks.length ? remaining / activeImplicitTasks.length : 0;
 
   let progress = 0;
-  linkedTasks.forEach(t => {
-    const weight = hasContribution(t) ? Number(t.milestoneContribution) : implicitShare;
-    if (t.done) progress += weight;
+  linkedTasks.forEach(({ task }) => {
+    if (!task.done) return;
+    progress += hasContribution({ task }) ? Number(task.milestoneContribution) : implicitShare;
   });
   return Math.min(100, Math.round(progress));
 }
@@ -2510,23 +2517,26 @@ async function toggleTask(date, taskId) {
   // API call
   await API.toggleTask(taskId);
 
-  if (t.goalId) {
-    const goal = state.goals.find(g => g.id === t.goalId);
-    if (goal) {
-      const milestone = t.milestoneId ? (goal.milestones || []).find(m => m.id === t.milestoneId) : null;
-      if (t.done && milestone) {
-        const mp = calcMilestoneProgress(milestone, t.goalId);
-        // Only show the progress toast if this isn't the task that just hit
-        // 100% — checkMilestoneCompletion below already shows the 🎉 toast
-        // for that case, so we don't want to double up.
-        if (mp < 100) toast(`✅ Task done — "${milestone.name}" now ${mp}% complete`, 'success');
-      } else if (t.done) {
-        toast('Task completed! ✅', 'success');
+  if (t.done) {
+    const goal = t.goalId ? state.goals.find(g => g.id === t.goalId) : null;
+    const milestone = (goal && t.milestoneId) ? (goal.milestones || []).find(m => m.id === t.milestoneId) : null;
+
+    if (milestone) {
+      const mp = calcMilestoneProgress(milestone, t.goalId);
+      if (mp >= 100 && !milestone.celebrated) {
+        milestone.celebrated = true;
+        save();
+        launchConfetti();
+        toast(`🎉 Milestone "${milestone.name}" completed!`, 'success');
+        try { await API.celebrateMilestone(t.goalId, milestone.id); }
+        catch (e) { /* non-fatal */ }
+      } else if (mp < 100) {
+        toast(`✅ Task done — "${milestone.name}" now ${mp}% complete`, 'success');
       }
-      checkMilestoneCompletion(goal, t.goalId);
+      // mp === 100 but already celebrated earlier: no toast, avoids repeats.
+    } else {
+      toast('Task completed! ✅', 'success');
     }
-  } else if (t.done) {
-    toast('Task completed! ✅', 'success');
   }
 
   renderTasks();
