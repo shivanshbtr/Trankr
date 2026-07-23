@@ -1473,7 +1473,7 @@ const API = {
   createMilestone:(gid,m)       => api('POST', `/goals/${gid}/milestones`, m),
   updateMilestone:(gid,mid,m)   => api('PUT',  `/goals/${gid}/milestones/${mid}`, m),
   deleteMilestone:(gid,mid)     => api('DELETE',`/goals/${gid}/milestones/${mid}`),
-  celebrateMilestone:(gid,mid)  => api('PATCH', `/goals/${gid}/milestones/${mid}/celebrate`),
+  celebrateMilestone:(gid,mid,celebrated=true)  => api('PATCH', `/goals/${gid}/milestones/${mid}/celebrate?celebrated=${celebrated}`),
 
   // Tasks
   getTasks:   (date)            => api('GET',  `/tasks/?date=${date}`),
@@ -2517,10 +2517,10 @@ async function toggleTask(date, taskId) {
   // API call
   await API.toggleTask(taskId);
 
-  if (t.done) {
-    const goal = t.goalId ? state.goals.find(g => g.id === t.goalId) : null;
-    const milestone = (goal && t.milestoneId) ? (goal.milestones || []).find(m => m.id === t.milestoneId) : null;
+  const goal = t.goalId ? state.goals.find(g => g.id === t.goalId) : null;
+  const milestone = (goal && t.milestoneId) ? (goal.milestones || []).find(m => m.id === t.milestoneId) : null;
 
+  if (t.done) {
     if (milestone) {
       const mp = calcMilestoneProgress(milestone, t.goalId);
       if (mp >= 100 && !milestone.celebrated) {
@@ -2536,6 +2536,17 @@ async function toggleTask(date, taskId) {
       // mp === 100 but already celebrated earlier: no toast, avoids repeats.
     } else {
       toast('Task completed!', 'success');
+    }
+  } else if (milestone && milestone.celebrated) {
+    // Un-checking a task can genuinely drop a milestone back below 100%.
+    // Reset the celebrated flag so a real future re-completion can fire the
+    // toast again — this is a legitimate new completion, not a repeat.
+    const mp = calcMilestoneProgress(milestone, t.goalId);
+    if (mp < 100) {
+      milestone.celebrated = false;
+      save();
+      try { await API.celebrateMilestone(t.goalId, milestone.id, false); }
+      catch (e) { /* non-fatal */ }
     }
   }
 
