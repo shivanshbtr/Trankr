@@ -113,7 +113,10 @@ def update_milestone(goal_id: str, milestone_id: str, body: schemas.MilestoneIn,
     m.name       = body.name
     m.weight     = body.weight
     m.deadline   = body.deadline
-    m.celebrated = body.celebrated or False
+    # celebrated is intentionally left untouched here — it's only ever set
+    # via the dedicated /celebrate endpoint, so a routine edit (name, weight,
+    # deadline) doesn't silently reset the "already congratulated" flag and
+    # cause the completion toast to fire again for the same milestone.
     db.commit(); db.refresh(m)
     return m
 
@@ -131,13 +134,13 @@ def delete_milestone(goal_id: str, milestone_id: str,
 
 
 @router.patch("/{goal_id}/milestones/{milestone_id}/celebrate")
-def mark_celebrated(goal_id: str, milestone_id: str,
+def mark_celebrated(goal_id: str, milestone_id: str, celebrated: bool = True,
                     user=Depends(get_current_user), db: Session = Depends(get_db)):
     m = db.query(models.Milestone).join(models.Goal).filter(
         models.Milestone.id == milestone_id,
         models.Goal.user_id == user.id).first()
     if not m:
         raise HTTPException(404, "Milestone not found")
-    m.celebrated = True
+    m.celebrated = celebrated
     db.commit()
     return {"ok": True}
