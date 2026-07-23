@@ -115,10 +115,17 @@ If you'd rather it always feel instant, go back to Render → your
 service → Environment tab → set SELF_URL to your actual Render URL
 from above (e.g. https://your-app-name.onrender.com, no trailing
 slash) → save. The app will then quietly ping its own /health endpoint
-every 10 minutes from a background thread, which keeps both the
-Render service and your Neon database's compute warm. Leave it blank
-if you don't mind occasional cold starts — nothing else changes either
-way.
+every 10 minutes from a background thread, keeping the Render service
+itself warm. Leave it blank if you don't mind occasional cold starts —
+nothing else changes either way.
+
+Note: this deliberately does NOT also keep Neon awake — Neon's free
+tier has a monthly compute-hour cap (100 CU-hours), not just a spin-
+down, so forcing it to stay on 24/7 would burn through that cap in
+about 2-3 weeks instead of a full month. Neon's own cold start is
+fast (well under 2 seconds), so it's better left to sleep between real
+use — you may notice a brief pause on your very first action after a
+quiet period, that's normal and expected.
 
 BEFORE enabling this: Render's free tier gives 750 instance-hours per
 month for your WHOLE account, not per service. Keeping this one app
@@ -150,6 +157,14 @@ NOTES
 - Render's free tier spins down after ~15 minutes of inactivity — the
   first request after a break takes ~30 seconds to wake up. Normal.
   Set SELF_URL (see Step 4) if you'd rather avoid this entirely.
+- Neon's free tier separately scales its compute to zero after a period
+  of no queries — this is expected and by design, not a problem to fix.
+  Its own wake-up is fast (well under 2 seconds), so the SELF_URL
+  keep-alive above deliberately leaves it alone rather than forcing it
+  to stay on. Neon's free tier also has a monthly compute-hour cap
+  (100 CU-hours), so keeping it awake 24/7 would actually use up that
+  budget in about 2-3 weeks — letting it sleep between real use is
+  what keeps it free all month. Your data is never at risk either way.
 - IMPORTANT if SELF_URL is set: Render's free tier gives you 750
   instance-hours per month, shared across your WHOLE account, not per
   service. Keeping one service alive 24/7 uses ~730 of those hours by
@@ -160,10 +175,6 @@ NOTES
   app included, check your usage under Render's account-level Billing
   / Usage page. Keeping Trankr as the only free service on the account
   avoids this entirely.
-- Neon's free tier also suspends its compute after a period of no
-  queries (separate from Render's spin-down, and separate from data
-  loss — your data is never at risk either way). The SELF_URL setting
-  above keeps this warm too, since /health includes a trivial query.
 - Neon's free tier gives 0.5 GB of storage, which is far more than a
   personal instance will use even after years of daily use.
 - Your data belongs to you — this is your own Postgres database, and you
