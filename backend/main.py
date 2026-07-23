@@ -8,7 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 import os
+import threading
+import time
+import requests
 
 from database import engine, get_db, Base
 import models, schemas
@@ -299,9 +303,40 @@ if os.path.isdir(frontend_dir):
 
 
 # ── Health check ─────────────────────────────────────────────────────────────
+# Also runs a trivial DB query, so a keep-alive ping to this endpoint prevents
+# both Render's web-service spin-down AND Neon's free-tier compute suspension
+# (Neon suspends its compute after a period of no queries; this keeps it warm).
 @app.get("/health", tags=["Meta"])
-def health():
+def health(db: Session = Depends(get_db)):
+    db.execute(text("SELECT 1"))
     return {"status": "ok", "app": "Trankr"}
+
+
+# ── Self-ping keep-alive (optional) ────────────────────────────────────────────
+# If SELF_URL is set (see .env.example), the app pings its own /health endpoint
+# every 10 minutes from a background thread. This is enough to stop Render's
+# free-tier web service from spinning down after 15 minutes of inactivity, and
+# since /health now touches the DB, it keeps Neon's compute warm too.
+# Leave SELF_URL unset to disable this entirely (e.g. for local dev).
+SELF_URL = os.getenv("SELF_URL", "").rstrip("/")
+KEEP_ALIVE_INTERVAL_SECONDS = int(os.getenv("KEEP_ALIVE_INTERVAL_SECONDS", "600"))  # 10 min
+
+
+def _keep_alive_loop():
+    while True:
+        time.sleep(KEEP_ALIVE_INTERVAL_SECONDS)
+        try:
+            requests.get(f"{SELF_URL}/health", timeout=10)
+        except Exception:
+            # Never let a failed ping crash the loop or the app.
+            pass
+
+
+@app.on_event("startup")
+def start_keep_alive():
+    if SELF_URL:
+        thread = threading.Thread(target=_keep_alive_loop, daemon=True)
+        thread.start()
 
 
 if __name__ == "__main__":
