@@ -87,6 +87,9 @@ STEP 4 — Deploy the backend (Render)
      PYTHON_VERSION = 3.11.9 (only needed if the build fails with a
                         Python version/compilation error — pins Render
                         to a stable Python version)
+     SELF_URL       = (optional — see "Keep-alive" note below Step 4;
+                        leave blank until you know your Render URL,
+                        then come back and set it)
 
    For SECRET_KEY, use any long random string. If you have Python installed,
    this command generates one:
@@ -104,6 +107,26 @@ IMPORTANT: go back to Google Cloud Console (Step 3) → your OAuth client
 already (must match exactly, including https://, no trailing slash).
 Without this, clicking "Continue with Google" will fail with an
 "origin mismatch" error.
+
+OPTIONAL — keep it awake (skip if you're fine with the occasional
+30-50 second wake-up delay described in NOTES below):
+Render's free tier spins your app down after ~15 minutes of no traffic.
+If you'd rather it always feel instant, go back to Render → your
+service → Environment tab → set SELF_URL to your actual Render URL
+from above (e.g. https://your-app-name.onrender.com, no trailing
+slash) → save. The app will then quietly ping its own /health endpoint
+every 10 minutes from a background thread, which keeps both the
+Render service and your Neon database's compute warm. Leave it blank
+if you don't mind occasional cold starts — nothing else changes either
+way.
+
+BEFORE enabling this: Render's free tier gives 750 instance-hours per
+month for your WHOLE account, not per service. Keeping this one app
+alive 24/7 uses close to all 750 by itself. This only works cleanly if
+Trankr is the ONLY free service on that Render account — if you spin
+up any other free web service there too, you'll run out of hours
+before the month resets and Render will start suspending things. See
+NOTES below for what to do if that happens.
 
 
 STEP 5 — Sign in
@@ -126,6 +149,21 @@ NOTES
 ---------
 - Render's free tier spins down after ~15 minutes of inactivity — the
   first request after a break takes ~30 seconds to wake up. Normal.
+  Set SELF_URL (see Step 4) if you'd rather avoid this entirely.
+- IMPORTANT if SELF_URL is set: Render's free tier gives you 750
+  instance-hours per month, shared across your WHOLE account, not per
+  service. Keeping one service alive 24/7 uses ~730 of those hours by
+  itself — right at the limit. If you run any OTHER free web service
+  on the same Render account (a different project, a test deploy,
+  etc.), the combined hours will exceed 750 before the month ends and
+  Render will suspend services until it resets. If that happens, this
+  app included, check your usage under Render's account-level Billing
+  / Usage page. Keeping Trankr as the only free service on the account
+  avoids this entirely.
+- Neon's free tier also suspends its compute after a period of no
+  queries (separate from Render's spin-down, and separate from data
+  loss — your data is never at risk either way). The SELF_URL setting
+  above keeps this warm too, since /health includes a trivial query.
 - Neon's free tier gives 0.5 GB of storage, which is far more than a
   personal instance will use even after years of daily use.
 - Your data belongs to you — this is your own Postgres database, and you
